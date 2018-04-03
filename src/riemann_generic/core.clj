@@ -87,6 +87,34 @@
       (fn [event]
         (call-rescue event children)))))
 
+(defn threshold-during-fn
+  "if the condition `threshold-fn`(which should be function
+  accepting an event)is valid for all events
+  received during at least the period `dt`, valid events received after the `dt`
+  period will be passed on until an invalid event arrives. Forward to children.
+  `:metric` should not be nil (it will produce exceptions).
+
+  `opts` keys:
+  - `:threshold-fn` : A function accepting an event and returning a boolean.
+  - `:duration`     : The time period in seconds.
+  - `:state`        : The state of event forwarded to children.
+
+  Example:
+
+  (threshold-during-fn {:threshold-fn #(and 
+                                           (> (:metric %) 42) 
+                                           (compare (:service %) \"foo\"))
+                        :duration 10
+                        :state \"critical\"})
+
+  Set `:state` to \"critical\" if events `:metric` is > to 42 and `:metric` is \"foo\" during 10 sec or more."
+  [opts & children]
+  (dt/cond-dt (:threshold-fn opts) (:duration opts) 
+    (with :state (:state opts) 
+      (fn [event]
+        (call-rescue event children)))))
+
+
 (defn below
   "If the condition `(< (:metric event) threshold)` is valid for all events
   received during at least the period `dt`, valid events received after the `dt`
@@ -293,6 +321,7 @@ Example:
   (let [s (condp = stream-key
             :threshold threshold
             :threshold-fn threshold-fn
+            :threshold-during-fn threshold-during-fn
             :above above
             :below below
             :scount scount
