@@ -301,6 +301,28 @@ Example:
     (scount opts
       (apply sdo child-streams))))
 
+(defn regex-dt
+  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt`
+  period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+  `:metric` should not be nil (it will produce exceptions).
+
+
+  `opts` keys:
+  - `:pattern`  : A string regex
+  - `:duration` : The time period in seconds.
+
+  Example:
+
+  (regex-dt {:pattern '.*(?i)error.*' :duration 10 } 
+            children)"
+
+  [opts & children]
+
+  (apply threshold-during-fn {:threshold-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
+                              :duration (:duration opts) 
+                              :state "critical"} 
+                             children))
+
 (defn expired-host
   [opts & children]
   (sdo
@@ -329,6 +351,7 @@ Example:
             :outside outside
             :percentiles-crit percentiles-crit
             :between between
+            :regex-dt regex-dt
             :critical critical)
         streams (mapv (fn [config]
                         (let [children (:children config)
@@ -339,8 +362,8 @@ Example:
                             (where (match-clause event)
                               stream)
                             stream)))
-                      streams-config)]
-    (apply sdo streams)))
+                     streams-config)]
+     (apply sdo streams)))
 
 (defn generate-streams
   [config]

@@ -169,6 +169,18 @@
     (s {:time 14  :service "bar" :state "ok"})
     (is (= @out [{:state "critical" :time 12 :service "bar"}
                  {:state "critical" :time 13 :service "lol"}])))
+
+  (let [out (atom [])
+        child #(swap! out conj %)
+        s (generate-streams {:regex-dt [{:pattern ".*(?i)error.*"
+                                         :duration 20
+                                         :children [child]}]})]
+    (s {:time 0 :metric "foo"})
+    (s {:time 10 :metric "bar"})
+    (s {:time 30 :metric "error"})
+    (s {:time 51 :metric "ggwp ERROR"})
+    (is (= @out [{:time 51 :metric "ggwp ERROR" :state "critical"}])))
+
   (let [out (atom [])
         child #(swap! out conj %)
         s (generate-streams {:critical [{:where #(= (:service %) "bar")
@@ -207,6 +219,7 @@
                  {:service "foo" :metric 40 :state "warning"}
                  {:service "foo" :metric 70 :state "critical"}
                  {:service "foo" :metric 90 :state "critical"}]))))
+
 
 (deftest percentile-crit-test
   (test-stream (percentile-crit {:service "api req"
@@ -286,5 +299,14 @@
      {:time 61}]
     [{:time 1 :metric 6 :state "critical"}]))
 
+(deftest regex-dt-test
+  (test-stream (regex-dt {:pattern ".*(?i)error.*" 
+                          :duration 20})
+    [{:time 0  :metric "foo"}
+     {:time 10 :metric "bar"}
+     {:time 30 :metric "error"}
+     {:time 51 :metric "ggwp Error"}
+     ]
+    [{:time 51 :metric "ggwp Error" :state "critical"}]))
 
 (def kafka-output #(println % " => event"))
