@@ -44,6 +44,38 @@
       [{:metric 30 :state "warning"}
        {:metric 40 :state "warning"}])))
 
+(deftest condition-during-test
+  (testing "should find event over 9000 during 10s "
+    (test-stream (condition-during {:condition-fn #(and 
+                                                     (> (:metric %) 9000) 
+                                                     (compare (:service %) "power"))
+                                       :duration 10
+                                       :state "disaster"})
+               [{:metric 10   :time 0  :service "power"}
+                {:metric 9001 :time 1  :service "power"}
+                {:metric 9001 :time 2  :service "bar"}
+                {:metric 9002 :time 12 :service "power"}
+                {:metric 9500 :time 13 :service "power"}
+                {:metric 8000 :time 14 :service "power"}
+                {:metric 9999 :time 15 :service "bar"}]
+               [{:metric 9002 :state "disaster" :time 12 :service "power"}
+                {:metric 9500 :state "disaster" :time 13 :service "power"}]))
+  (testing "should not find event over 9000 during 10s with instabilized metrics "
+    (test-stream (condition-during {:condition-fn #(and 
+                                                     (> (:metric %) 9000) 
+                                                     (compare (:service %) "power"))
+                                       :duration 10
+                                       :state "disaster"})
+               [{:metric 10   :time 0  :service "power"}
+                {:metric 9001 :time 1  :service "power"}
+                {:metric 9001 :time 2  :service "bar"}
+                {:metric 7000 :time 6  :service "power"}
+                {:metric 9002 :time 12 :service "power"}
+                {:metric 9500 :time 13 :service "power"}
+                {:metric 8000 :time 14 :service "power"}
+                {:metric 9999 :time 15 :service "bar"}]
+               [])))
+
 (deftest above-test
   (test-stream (above {:threshold 70 :duration 10})
                [{:metric 40 :time 0}
@@ -59,49 +91,7 @@
                 {:metric 90 :time 13}]
                []))
 
-(deftest threshold-during-fn-test
-  (test-stream (threshold-during-fn {:threshold-fn #(and 
-                                           (> (:metric %) 42) 
-                                           (compare (:service %) "foo"))
-                                      :duration 10
-                                      :state "critical"})
-               [{:metric 40 :time 0  :service "foo"}
-                {:metric 43 :time 1  :service "foo"}
-                {:metric 43 :time 2  :service "bar"}
-                {:metric 44 :time 12 :service "foo"}
-                {:metric 45 :time 13 :service "foo"}
-                {:metric 10 :time 14 :service "foo"}
-                {:metric 66 :time 15 :service "bar"}]
-               [{:metric 44 :state "critical" :time 12 :service "foo"}
-                {:metric 45 :state "critical" :time 13 :service "foo"}])
-    (test-stream (threshold-during-fn {:threshold-fn #(and 
-                                           (> (:metric %) 42) 
-                                           (compare (:service %) "foo"))
-                                       :duration 10
-                                       :state "disaster"})
-               [{:metric 40 :time 0  :service "foo"}
-                {:metric 43 :time 1  :service "foo"}
-                {:metric 43 :time 2  :service "bar"}
-                {:metric 44 :time 12 :service "foo"}
-                {:metric 45 :time 13 :service "foo"}
-                {:metric 10 :time 14 :service "foo"}
-                {:metric 66 :time 15 :service "bar"}]
-               [{:metric 44 :state "disaster" :time 12 :service "foo"}
-                {:metric 45 :state "disaster" :time 13 :service "foo"}])
-    (test-stream (threshold-during-fn {:threshold-fn #(and 
-                                           (> (:metric %) 42) 
-                                           (compare (:service %) "foo"))
-                                       :duration 10
-                                       :state "critical"})
-               [{:metric 40 :time 0  :service "foo"}
-                {:metric 43 :time 1  :service "foo"}
-                {:metric 43 :time 2  :service "bar"}
-                {:metric 12 :time 6  :service "foo"}
-                {:metric 44 :time 12 :service "foo"}
-                {:metric 45 :time 13 :service "foo"}
-                {:metric 10 :time 14 :service "foo"}
-                {:metric 66 :time 15 :service "bar"}]
-               []))
+
 
 
 (deftest below-test
@@ -162,6 +152,25 @@
     (s {:metric 90})
     (is (= [{:metric 30 :state "warning"}
             {:metric 40 :state "warning"}]
+           @out)))
+
+  (let [out (atom [])
+        child #(swap! out conj %)
+        s (generate-streams {:condition-during [{:condition-fn #(and 
+                                                                  (> (:metric %) 9000) 
+                                                                  (compare (:service %) "power"))
+                                          :duration 10
+                                          :state "disaster"
+                                          :children [child]}]})]
+    (s {:metric 10   :time 0  :service "power"})
+    (s {:metric 9001 :time 1  :service "power"})
+    (s {:metric 9001 :time 2  :service "bar"})
+    (s {:metric 9002 :time 12 :service "power"})
+    (s {:metric 9500 :time 13 :service "power"})
+    (s {:metric 8000 :time 14 :service "power"})
+    (s {:metric 9999 :time 15 :service "bar"})
+    (is (= [{:metric 9002 :state "disaster" :time 12 :service "power"}
+            {:metric 9500 :state "disaster" :time 13 :service "power"}]
            @out)))
 
 
