@@ -35,36 +35,30 @@
                                  (call-rescue event children)))))])]
     (apply sdo child-streams)))
 
-(defn threshold-fn
-  "Use the `:warning-fn` and `:critical-fn` values (which should be function
+(defn condition
+  "Use the `:condition-fn` value (which should be function
   accepting an event) to set the event `:state` accordely. Forward events to
   children
 
   `opts` keys:
-  - `:critical-fn` : A function accepting an event and returning a boolean (optional).
-  - `:warning-fn`  : A function accepting an event and returning a boolean (optional).
+  - `:condition-fn` : A function accepting an event and returning a boolean 
+  - `:state`        : The state of event forwarded to children.
 
   Example:
 
-  (threshold-fn {:warning-fn #(and (>= (:metric %) 30)
-                                   (< (:metric %) 70))
-                 :critical-fn #(>= (:metric %) 70)})
+  (condition {:condition-fn #(and (>= (:metric %) 30)
+                                  (< (:metric %) 70))
+              :state \"warning\"})
 
-  In this example, event :state will be \"warning\" if `:metric` is >= 30 and < 70
-  and \"critical\" if `:metric` is >= 70"
+  In this example, event :state will be \"warning\" if `:metric` is >= 30 and < 70" 
   [opts & children]
-  (let [child-streams (remove nil?
-                        [(when (:warning-fn opts)
-                           (where ((:warning-fn opts) event)
-                                  (with :state "warning"
-                                        (fn [event]
-                                          (call-rescue event children)))))
-                         (when (:critical-fn opts)
-                           (where ((:critical-fn opts) event)
-                                  (with :state "critical"
-                                        (fn [event]
-                                          (call-rescue event children)))))])]
-    (apply sdo child-streams)))
+  (let [child-stream (remove nil?
+                        [(when (:condition-fn opts)
+                          (where ((:condition-fn opts) event)
+                            (with :state (:state opts)
+                              (fn [event]
+                                (call-rescue event children)))))])]
+    (apply sdo child-stream)))
 
 (defn above
   "If the condition `(> (:metric event) threshold)` is valid for all events
@@ -342,7 +336,7 @@ Example:
   [[stream-key streams-config]]
   (let [s (condp = stream-key
             :threshold threshold
-            :threshold-fn threshold-fn
+            :condition condition
             :threshold-during-fn threshold-during-fn
             :above above
             :below below

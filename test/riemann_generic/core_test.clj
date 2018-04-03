@@ -31,27 +31,18 @@
       [{:metric 70 :state "critical"}
        {:metric 90 :state "critical"}])))
 
-(deftest threshold-fn-test
-  (testing "critical"
-    (test-stream (threshold-fn {:critical-fn #(>= (:metric %) 70)})
-      [{:metric 40}
-       {:metric 70}
-       {:metric 90}]
-      [{:metric 70 :state "critical"}
-       {:metric 90 :state "critical"}]))
-  (testing "warning and critical"
-    (test-stream (threshold-fn {:warning-fn #(and (>= (:metric %) 30)
-                                               (< (:metric %) 70))
-                                :critical-fn #(>= (:metric %) 70)})
+(deftest condition-test
+  (testing "condition"
+    (test-stream (condition {:condition-fn #(and (>= (:metric %) 30)
+                                                 (< (:metric %) 70))
+                             :state "warning"})
       [{:metric 29}
        {:metric 30}
        {:metric 40}
        {:metric 70}
        {:metric 90}]
       [{:metric 30 :state "warning"}
-       {:metric 40 :state "warning"}
-       {:metric 70 :state "critical"}
-       {:metric 90 :state "critical"}])))
+       {:metric 40 :state "warning"}])))
 
 (deftest above-test
   (test-stream (above {:threshold 70 :duration 10})
@@ -158,6 +149,22 @@
                 {:state "critical" :time 13}]))
 
 (deftest generate-streams-test
+  (let [out (atom [])
+        child #(swap! out conj %)
+        s (generate-streams {:condition [{:condition-fn #(and (>= (:metric %) 30)
+                                                    (< (:metric %) 70))
+                                          :state "warning"
+                                          :children [child]}]})]
+    (s {:metric 29})
+    (s {:metric 30})
+    (s {:metric 40})
+    (s {:metric 70})
+    (s {:metric 90})
+    (is (= [{:metric 30 :state "warning"}
+            {:metric 40 :state "warning"}]
+           @out)))
+
+
   (let [out (atom [])
         child #(swap! out conj %)
         s (generate-streams {:critical [{:duration 10
