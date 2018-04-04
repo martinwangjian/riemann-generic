@@ -91,9 +91,6 @@
                 {:metric 90 :time 13}]
                []))
 
-
-
-
 (deftest below-during-test
   (test-stream (below-during {:threshold 70 :duration 10 :state "critical"})
                [{:metric 80 :time 0}
@@ -116,10 +113,11 @@
                [{:metric 80 :state "critical" :time 12}
                 {:metric 81 :state "critical" :time 13}]))
 
-(deftest outside-test
-  (test-stream (outside {:min-threshold 70
-                         :max-threshold 90
-                         :duration 10})
+(deftest outside-during-test
+  (test-stream (outside-during {:min-threshold 70
+                                :max-threshold 90
+                                :duration 10
+                                :state "critical"})
                [{:metric 80 :time 0}
                 {:metric 100 :time 1}
                 {:metric 101 :time 12}
