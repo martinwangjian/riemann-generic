@@ -91,6 +91,23 @@
       (fn [event]
         (call-rescue event children)))))
 
+(defn below
+  "if the `:metric` event value is strictly inferior to the values of `:threshold` in `opts` and update the event state accordely, and forward to children.
+
+  `opts` keys:
+  - `:threshold` : A number, the event `:state` will be set to `critical` if the event metric is > to the value. 
+  - `:state`     : The state of event forwarded to children.
+
+  Example:
+
+  (below {:threshold 30 :state \"critical\"} email)
+
+  Set `:state` to \"critical\" if events `:metric` is < to 30."
+  [opts & children]
+  (apply condition {:condition-fn #(< (:metric %) (:threshold opts))
+                    :state (:state opts)}
+                   children)) 
+
 (defn below-during
   "If the condition `(< (:metric event) threshold)` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
   `:metric` should not be nil (it will produce exceptions).
@@ -309,6 +326,7 @@ Example:
             :condition-during condition-during
             :above above
             :above-during above-during
+            :below below
             :below-during below-during
             :outside-during outside-during
             :between-during between-during

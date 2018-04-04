@@ -78,6 +78,16 @@
                 {:metric 90 :time 13}]
                []))
 
+(deftest below-test
+  (test-stream (below {:threshold 9000 :state "critical"})
+    [{:metric 8000}
+     {:metric 9000}
+     {:metric 9001}
+     {:metric 8999}
+     {:metric 9999}]
+    [{:metric 8000 :state "critical"}
+     {:metric 8999 :state "critical"}]))
+
 (deftest below-during-test
   (test-stream (below-during {:threshold 70 :duration 10 :state "critical"})
                [{:metric 80 :time 0}
