@@ -187,9 +187,10 @@
 
   (let [out (atom [])
         child #(swap! out conj %)
-        s (generate-streams {:regex-dt [{:pattern ".*(?i)error.*"
-                                         :duration 20
-                                         :children [child]}]})]
+        s (generate-streams {:regex-during [{:pattern ".*(?i)error.*"
+                                             :duration 20
+                                             :state "critical"
+                                             :children [child]}]})]
     (s {:time 0 :metric "foo"})
     (s {:time 10 :metric "bar"})
     (s {:time 30 :metric "error"})
@@ -314,9 +315,10 @@
      {:time 61}]
     [{:time 1 :metric 6 :state "critical"}]))
 
-(deftest regex-dt-test
-  (test-stream (regex-dt {:pattern ".*(?i)error.*" 
-                          :duration 20})
+(deftest regex-during-test
+  (test-stream (regex-during {:pattern ".*(?i)error.*" 
+                              :duration 20
+                              :state "critical"})
     [{:time 0  :metric "foo"}
      {:time 10 :metric "bar"}
      {:time 30 :metric "error"}

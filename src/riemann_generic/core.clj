@@ -59,7 +59,7 @@
     (apply sdo child-stream)))
 
 (defn condition-during
-  "if the condition `condition-fn`(which should be function accepting an event)is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
+  "if the condition `condition-fn`(which should be function accepting an event) is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
   `opts` keys:
@@ -291,27 +291,28 @@ Example:
     (scount opts
       (apply sdo child-streams))))
 
-(defn regex-dt
-  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt`
-  period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+(defn regex-during
+  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
 
   `opts` keys:
   - `:pattern`  : A string regex
   - `:duration` : The time period in seconds.
+  - `:state`    : The state of event forwarded to children.
 
   Example:
 
-  (regex-dt {:pattern '.*(?i)error.*' :duration 10 } 
-            children)"
+  (regex-dt {:pattern '.*(?i)error.*' :duration 10 :state \"critical\"} 
+            children)
 
+  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
   [opts & children]
 
   (apply condition-during {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
-                              :duration (:duration opts) 
-                              :state "critical"} 
-                             children))
+                           :duration (:duration opts) 
+                           :state (:state opts)} 
+                          children))
 
 (defn expired-host
   [opts & children]
@@ -341,7 +342,7 @@ Example:
             :scount scount
             :scount-crit scount-crit
             :percentiles-crit percentiles-crit
-            :regex-dt regex-dt
+            :regex-during regex-during
             :critical critical)
         streams (mapv (fn [config]
                         (let [children (:children config)
