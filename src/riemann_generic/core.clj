@@ -7,34 +7,6 @@
 
 ;; (setq clojure-defun-style-default-indent t)
 
-(defn threshold
-  "Compare the `:metric` event value with the values of `:warning` in `:critical`
-  in `opts` and update the event state accordely, and forward to children.
-
-  `opts` keys:
-  - `:critical` : A number, the event `:state` will be set to `critical` if the
-  event metric is >= to the value. (optional)
-  - `:warning`  : A number, the event `:state` will be set to `warning` if the
-  event metric is < to `:critical` and >= to `:warning` (optional)
-
-  Example:
-
-  (threshold {:warning 30 :critical 70} email)"
-  [opts & children]
-  (let [child-streams (remove nil?
-                        [(when (:warning opts)
-                           (where (and (< (:metric event) (:critical opts))
-                                    (>= (:metric event) (:warning opts)))
-                             (with :state "warning"
-                               (fn [event]
-                                 (call-rescue event children)))))
-                         (when (:critical opts)
-                           (where (>= (:metric event) (:critical opts))
-                             (with :state "critical"
-                               (fn [event]
-                                 (call-rescue event children)))))])]
-    (apply sdo child-streams)))
-
 (defn condition
   "Use the `:condition-fn` value (which should be function accepting an event) to set the event `:state` accordely. Forward events to children
 
@@ -81,6 +53,23 @@
     (with :state (:state opts) 
       (fn [event]
         (call-rescue event children)))))
+
+(defn above
+  "if the `:metric` event value is strictly superior to the values of `:threshold` in `opts` and update the event state accordely, and forward to children.
+
+  `opts` keys:
+  - `:threshold` : A number, the event `:state` will be set to `critical` if the event metric is > to the value. 
+  - `:state`     : The state of event forwarded to children.
+
+  Example:
+
+  (above {:threshold 30 :state \"critical\"} email)
+
+  Set `:state` to \"critical\" if events `:metric` is > to 30."
+  [opts & children]
+  (apply condition {:condition-fn #(> (:metric %) (:threshold opts))
+                    :state (:state opts)}
+                   children)) 
 
 (defn above-during
   "If the condition `(> (:metric event) threshold)` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
@@ -192,6 +181,7 @@
                            :duration (:duration opts) 
                            :state (:state opts)} 
                           children))
+
 
 (defn percentile-crit
   [opts & children]
@@ -315,9 +305,9 @@ Example:
 (defn generate-stream
   [[stream-key streams-config]]
   (let [s (condp = stream-key
-            :threshold threshold
             :condition condition
             :condition-during condition-during
+            :above above
             :above-during above-during
             :below-during below-during
             :outside-during outside-during
