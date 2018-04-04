@@ -36,9 +36,7 @@
     (apply sdo child-streams)))
 
 (defn condition
-  "Use the `:condition-fn` value (which should be function
-  accepting an event) to set the event `:state` accordely. Forward events to
-  children
+  "Use the `:condition-fn` value (which should be function accepting an event) to set the event `:state` accordely. Forward events to children
 
   `opts` keys:
   - `:condition-fn` : A function accepting an event and returning a boolean 
@@ -61,9 +59,7 @@
     (apply sdo child-stream)))
 
 (defn condition-during
-  "if the condition `condition-fn`(which should be function accepting an event)is valid for all events
-  received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. 
-  Forward to children.
+  "if the condition `condition-fn`(which should be function accepting an event)is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
   `opts` keys:
@@ -87,9 +83,7 @@
         (call-rescue event children)))))
 
 (defn above-during
-  "If the condition `(> (:metric event) threshold)` is valid for all events
-  received during at least the period `dt`, valid events received after the `dt`
-  period will be passed on until an invalid event arrives. Forward to children.
+  "If the condition `(> (:metric event) threshold)` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
   `opts` keys:
@@ -109,9 +103,7 @@
         (call-rescue event children)))))
 
 (defn below-during
-  "If the condition `(< (:metric event) threshold)` is valid for all events
-  received during at least the period `dt`, valid events received after the `dt`
-  period will be passed on until an invalid event arrives. Forward to children.
+  "If the condition `(< (:metric event) threshold)` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
   `opts` keys:
@@ -136,7 +128,8 @@
   `opts` keys:
   - `:min-threshold` : The min threshold
   - `:max-threshold` : The max threshold
-  - `:duration`   : The time period in seconds.
+  - `:duration`      : The time period in seconds.
+  - `:state`         : The state of event forwarded to children.
 
   Example:
 
@@ -152,26 +145,28 @@
       (fn [event]
         (call-rescue event children)))))
 
-(defn between
+(defn between-during
   "If the condition `(and (> (:metric event) low) (< (:metric event) high))` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives.
 
   `:metric` should not be nil (it will produce exceptions).
   `opts` keys:
   - `:min-threshold` : The min threshold
   - `:max-threshold` : The max threshold
-  - `:duration`   : The time period in seconds.
+  - `:duration`      : The time period in seconds.
+  - `:state`         : The state of event forwarded to children.
 
   Example:
 
-  (between {:min-threshold 70
-            :max-threshold 90
-            :duration 10
-            :service \"bar\"})
+  (between-during {:min-threshold 70
+                   :max-threshold 90
+                   :duration 10
+                   :service \"bar\"
+                   :state \"critical\"})
 
   Set `:state` to \"critical\" if events `:metric` is > to 70 and < 90 during 10 sec or more."
   [opts & children]
   (dt/between (:min-threshold opts) (:max-threshold opts) (:duration opts)
-    (with :state "critical"
+    (with :state (:state opts)
       (fn [event]
         (call-rescue event children)))))
 
@@ -342,10 +337,10 @@ Example:
             :above-during above-during
             :below-during below-during
             :outside-during outside-during
+            :between-during between-during
             :scount scount
             :scount-crit scount-crit
             :percentiles-crit percentiles-crit
-            :between between
             :regex-dt regex-dt
             :critical critical)
         streams (mapv (fn [config]
