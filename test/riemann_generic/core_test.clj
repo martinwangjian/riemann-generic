@@ -127,16 +127,6 @@
                [{:metric 101 :state "critical" :time 12}
                 {:metric 1   :state "critical" :time 13}]))
 
-(deftest critical-test
-  (test-stream (critical {:duration 10})
-               [{:time 0 :state "critical"}
-                {:time 1 :state "critical"}
-                {:time 12 :state "critical"}
-                {:time 13 :state "critical"}
-                {:time 14 :state "ok"}]
-               [{:state "critical" :time 12}
-                {:state "critical" :time 13}]))
-
 (deftest generate-streams-test
   (let [out (atom [])
         child #(swap! out conj %)
@@ -172,19 +162,6 @@
             {:metric 9500 :state "disaster" :time 13 :service "power"}]
            @out)))
 
-
-  (let [out (atom [])
-        child #(swap! out conj %)
-        s (generate-streams {:critical [{:duration 10
-                                         :children [child]}]})]
-    (s {:time 0 :service "baz" :state "critical"})
-    (s {:time 1 :service "bar" :state "critical"})
-    (s {:time 12 :service "bar" :state "critical"})
-    (s {:time 13 :service "lol" :state "critical"})
-    (s {:time 14  :service "bar" :state "ok"})
-    (is (= @out [{:state "critical" :time 12 :service "bar"}
-                 {:state "critical" :time 13 :service "lol"}])))
-
   (let [out (atom [])
         child #(swap! out conj %)
         s (generate-streams {:regex-during [{:pattern ".*(?i)error.*"
@@ -199,39 +176,17 @@
 
   (let [out (atom [])
         child #(swap! out conj %)
-        s (generate-streams {:critical [{:where #(= (:service %) "bar")
-                                         :duration 10
-                                         :children [child]}]})]
-    (s {:time 0 :service "bar" :state "critical"})
-    (s {:time 1 :service "bar" :state "critical"})
-    (s {:time 12 :service "bar" :state "critical"})
-    (s {:time 13 :service "bar" :state "critical"})
-    (s {:time 14  :service "bar" :state "ok"})
-    (is (= @out [{:state "critical" :time 12 :service "bar"}
-                 {:state "critical" :time 13 :service "bar"}])))
-  (let [out (atom [])
-        child #(swap! out conj %)
-        s (generate-streams {:critical [{:where #(= (:service %) "bar")
-                                         :duration 10
-                                         :children [child]}]
-                             :threshold [{:where #(= (:service %) "foo")
+        s (generate-streams {:threshold [{:where #(= (:service %) "foo")
                                           :warning 30
                                           :critical 70
                                           :children [child]}]})]
-    (s {:time 0 :service "bar" :state "critical"})
-    (s {:time 1 :service "bar" :state "critical"})
-    (s {:time 12 :service "bar" :state "critical"})
-    (s {:time 13 :service "bar" :state "critical"})
-    (s {:time 14  :service "bar" :state "ok"})
     (s {:service "foo" :metric 29})
     (s {:service "foo" :metric 30})
     (s {:service "foo" :metric 40})
     (s {:service "foo" :metric 70})
     (s {:service "bar" :metric 70})
     (s {:service "foo" :metric 90})
-    (is (= @out [{:state "critical" :time 12 :service "bar"}
-                 {:state "critical" :time 13 :service "bar"}
-                 {:service "foo" :metric 30 :state "warning"}
+    (is (= @out [{:service "foo" :metric 30 :state "warning"}
                  {:service "foo" :metric 40 :state "warning"}
                  {:service "foo" :metric 70 :state "critical"}
                  {:service "foo" :metric 90 :state "critical"}]))))

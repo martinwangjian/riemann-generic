@@ -170,22 +170,28 @@
       (fn [event]
         (call-rescue event children)))))
 
-(defn critical
-  "Takes a time period in seconds `durationt`.
-  If all events received during at least the period `durationt` have `:state` critical, new critical events received after the `durationt` period will be passed on until an invalid event arrives.
+(defn regex-during
+  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+  `:metric` should not be nil (it will produce exceptions).
+
 
   `opts` keys:
-  - `:duration`   : The time period in seconds.
+  - `:pattern`  : A string regex
+  - `:duration` : The time period in seconds.
+  - `:state`    : The state of event forwarded to children.
 
   Example:
 
-  (critical {:duration \"10\"} email)
+  (regex-dt {:pattern '.*(?i)error.*' :duration 10 :state \"critical\"} 
+            children)
 
-  Set `:state` to \"critical\" if events `:state` is critical during 10 sec or more."
+  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
   [opts & children]
-  (dt/critical (:duration opts)
-    (fn [event]
-      (call-rescue event children))))
+
+  (apply condition-during {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
+                           :duration (:duration opts) 
+                           :state (:state opts)} 
+                          children))
 
 (defn percentile-crit
   [opts & children]
@@ -291,29 +297,6 @@ Example:
     (scount opts
       (apply sdo child-streams))))
 
-(defn regex-during
-  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
-  `:metric` should not be nil (it will produce exceptions).
-
-
-  `opts` keys:
-  - `:pattern`  : A string regex
-  - `:duration` : The time period in seconds.
-  - `:state`    : The state of event forwarded to children.
-
-  Example:
-
-  (regex-dt {:pattern '.*(?i)error.*' :duration 10 :state \"critical\"} 
-            children)
-
-  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
-  [opts & children]
-
-  (apply condition-during {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
-                           :duration (:duration opts) 
-                           :state (:state opts)} 
-                          children))
-
 (defn expired-host
   [opts & children]
   (sdo
@@ -339,11 +322,10 @@ Example:
             :below-during below-during
             :outside-during outside-during
             :between-during between-during
+            :regex-during regex-during
             :scount scount
             :scount-crit scount-crit
-            :percentiles-crit percentiles-crit
-            :regex-during regex-during
-            :critical critical)
+            :percentiles-crit percentiles-crit)
         streams (mapv (fn [config]
                         (let [children (:children config)
                               stream (apply (partial s
