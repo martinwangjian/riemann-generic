@@ -99,7 +99,7 @@
 
   Example:
 
-  (above-during {:threshold 70 :duration 10 :state 'critical'} email)
+  (above-during {:threshold 70 :duration 10 :state \"critical\"} email)
 
   Set `:state` to \"critical\" if events `:metric` is > to 70 during 10 sec or more."
   [opts & children]
@@ -108,7 +108,7 @@
       (fn [event]
         (call-rescue event children)))))
 
-(defn below
+(defn below-during
   "If the condition `(< (:metric event) threshold)` is valid for all events
   received during at least the period `dt`, valid events received after the `dt`
   period will be passed on until an invalid event arrives. Forward to children.
@@ -116,16 +116,17 @@
 
   `opts` keys:
   - `:threshold` : The threshold used by the above stream
-  - `:duration`   : The time period in seconds.
+  - `:duration`  : The time period in seconds.
+  - `:state`     : The state of event forwarded to children.
 
   Example:
 
-  (below {:threshold 70 :duration 10} email)
+  (below-during {:threshold 70 :duration 10 :state \"critical\"} email)
 
   Set `:state` to \"critical\" if events `:metric` is < to 70 during 10 sec or more."
   [opts & children]
   (dt/below (:threshold opts) (:duration opts)
-    (with :state "critical"
+    (with :state (:state opts)
       (fn [event]
         (call-rescue event children)))))
 
@@ -338,7 +339,7 @@ Example:
             :condition condition
             :condition-during condition-during
             :above-during above-during
-            :below below
+            :below-during below-during
             :scount scount
             :scount-crit scount-crit
             :outside outside

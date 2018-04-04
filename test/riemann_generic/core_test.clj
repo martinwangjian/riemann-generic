@@ -94,8 +94,8 @@
 
 
 
-(deftest below-test
-  (test-stream (below {:threshold 70 :duration 10})
+(deftest below-during-test
+  (test-stream (below-during {:threshold 70 :duration 10 :state "critical"})
                [{:metric 80 :time 0}
                 {:metric 40 :time 1}
                 {:metric 40 :time 12}
