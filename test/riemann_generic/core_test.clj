@@ -242,17 +242,17 @@
            {:time 23 :service "api req 0" :metric 30}]))))
 
 (deftest scount-test
-  (test-stream (scount {:duration 20})
+  (test-stream (scount {:duration 30})
     [{:time 1}
      {:time 19}
      {:time 30}
      {:time 31}
      {:time 35}
      {:time 61}]
-    [{:time 1 :metric 2}
-     {:time 30 :metric 3}
+    [{:time 1  :metric 3}
+     {:time 31 :metric 2}
      ;; no event during the time window
-     (riemann.common/event {:metric 0 :time 61})]))
+     ]))
 
 (deftest scount-crit-test
   (test-stream (scount-crit {:service "foo"

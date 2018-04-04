@@ -258,7 +258,7 @@ Example:
 
   Will count the number of events in 20 seconds time windows and forward the result to children."
   [opts & children]
-  (fixed-time-window 20
+  (fixed-time-window (:duration opts)
     (smap riemann.folds/count
       (fn [event]
         (call-rescue event children)))))
@@ -278,7 +278,7 @@ Example:
   - `:warning-fn`  : A function accepting an event and returning a boolean (optional).
   Example:
 
-  (scount {:duration 20 :critical-fn #(> (:metric %) 5)} children)
+  (scount-crit {:duration 20 :critical-fn #(> (:metric %) 5)} children)
 
   Will count the number of events in 20 seconds time windows. If the count result
   is > to 5, set `:state` to \"critical\" and forward and forward the result to
