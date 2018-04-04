@@ -76,8 +76,8 @@
                 {:metric 9999 :time 15 :service "bar"}]
                [])))
 
-(deftest above-test
-  (test-stream (above {:threshold 70 :duration 10})
+(deftest above-during-test
+  (test-stream (above-during {:threshold 70 :duration 10 :state "critical"})
                [{:metric 40 :time 0}
                 {:metric 80 :time 1}
                 {:metric 80 :time 12}
@@ -85,7 +85,7 @@
                 {:metric 10 :time 14}]
                [{:metric 80 :state "critical" :time 12}
                 {:metric 81 :state "critical" :time 13}])
-  (test-stream (above {:threshold 70 :duration 10})
+  (test-stream (above-during {:threshold 70 :duration 10 :state "warning"})
                [{:metric 80 :time 1}
                 {:metric 40 :time 12}
                 {:metric 90 :time 13}]
