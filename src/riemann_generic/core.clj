@@ -7,34 +7,6 @@
 
 ;; (setq clojure-defun-style-default-indent t)
 
-(defn threshold
-  "Compare the `:metric` event value with the values of `:warning` in `:critical`
-  in `opts` and update the event state accordely, and forward to children.
-
-  `opts` keys:
-  - `:critical` : A number, the event `:state` will be set to `critical` if the
-  event metric is >= to the value. (optional)
-  - `:warning`  : A number, the event `:state` will be set to `warning` if the
-  event metric is < to `:critical` and >= to `:warning` (optional)
-
-  Example:
-
-  (threshold {:warning 30 :critical 70} email)"
-  [opts & children]
-  (let [child-streams (remove nil?
-                        [(when (:warning opts)
-                           (where (and (< (:metric event) (:critical opts))
-                                    (>= (:metric event) (:warning opts)))
-                             (with :state "warning"
-                               (fn [event]
-                                 (call-rescue event children)))))
-                         (when (:critical opts)
-                           (where (>= (:metric event) (:critical opts))
-                             (with :state "critical"
-                               (fn [event]
-                                 (call-rescue event children)))))])]
-    (apply sdo child-streams)))
-
 (defn condition
   "Use the `:condition-fn` value (which should be function accepting an event) to set the event `:state` accordely. Forward events to children
 
@@ -82,6 +54,23 @@
       (fn [event]
         (call-rescue event children)))))
 
+(defn above
+  "if the `:metric` event value is strictly superior to the values of `:threshold` in `opts` and update the event state accordely, and forward to children.
+
+  `opts` keys:
+  - `:threshold` : A number, the event `:state` will be set to `critical` if the event metric is > to the value. 
+  - `:state`     : The state of event forwarded to children.
+
+  Example:
+
+  (above {:threshold 30 :state \"critical\"} email)
+
+  Set `:state` to \"critical\" if events `:metric` is > to 30."
+  [opts & children]
+  (apply condition {:condition-fn #(> (:metric %) (:threshold opts))
+                    :state (:state opts)}
+                   children)) 
+
 (defn above-during
   "If the condition `(> (:metric event) threshold)` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
   `:metric` should not be nil (it will produce exceptions).
@@ -101,6 +90,23 @@
     (with :state (:state opts)
       (fn [event]
         (call-rescue event children)))))
+
+(defn below
+  "if the `:metric` event value is strictly inferior to the values of `:threshold` in `opts` and update the event state accordely, and forward to children.
+
+  `opts` keys:
+  - `:threshold` : A number, the event `:state` will be set to `critical` if the event metric is > to the value. 
+  - `:state`     : The state of event forwarded to children.
+
+  Example:
+
+  (below {:threshold 30 :state \"critical\"} email)
+
+  Set `:state` to \"critical\" if events `:metric` is < to 30."
+  [opts & children]
+  (apply condition {:condition-fn #(< (:metric %) (:threshold opts))
+                    :state (:state opts)}
+                   children)) 
 
 (defn below-during
   "If the condition `(< (:metric event) threshold)` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives. Forward to children.
@@ -170,22 +176,29 @@
       (fn [event]
         (call-rescue event children)))))
 
-(defn critical
-  "Takes a time period in seconds `durationt`.
-  If all events received during at least the period `durationt` have `:state` critical, new critical events received after the `durationt` period will be passed on until an invalid event arrives.
+(defn regex-during
+  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+  `:metric` should not be nil (it will produce exceptions).
+
 
   `opts` keys:
-  - `:duration`   : The time period in seconds.
+  - `:pattern`  : A string regex
+  - `:duration` : The time period in seconds.
+  - `:state`    : The state of event forwarded to children.
 
   Example:
 
-  (critical {:duration \"10\"} email)
+  (regex-dt {:pattern '.*(?i)error.*' :duration 10 :state \"critical\"} 
+            children)
 
-  Set `:state` to \"critical\" if events `:state` is critical during 10 sec or more."
+  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
   [opts & children]
-  (dt/critical (:duration opts)
-    (fn [event]
-      (call-rescue event children))))
+
+  (apply condition-during {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
+                           :duration (:duration opts) 
+                           :state (:state opts)} 
+                          children))
+
 
 (defn percentile-crit
   [opts & children]
@@ -252,7 +265,7 @@ Example:
 
   Will count the number of events in 20 seconds time windows and forward the result to children."
   [opts & children]
-  (fixed-time-window 20
+  (fixed-time-window (:duration opts)
     (smap riemann.folds/count
       (fn [event]
         (call-rescue event children)))))
@@ -272,7 +285,7 @@ Example:
   - `:warning-fn`  : A function accepting an event and returning a boolean (optional).
   Example:
 
-  (scount {:duration 20 :critical-fn #(> (:metric %) 5)} children)
+  (scount-crit {:duration 20 :critical-fn #(> (:metric %) 5)} children)
 
   Will count the number of events in 20 seconds time windows. If the count result
   is > to 5, set `:state` to \"critical\" and forward and forward the result to
@@ -290,29 +303,6 @@ Example:
                                             (call-rescue event children)))))])]
     (scount opts
       (apply sdo child-streams))))
-
-(defn regex-during
-  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
-  `:metric` should not be nil (it will produce exceptions).
-
-
-  `opts` keys:
-  - `:pattern`  : A string regex
-  - `:duration` : The time period in seconds.
-  - `:state`    : The state of event forwarded to children.
-
-  Example:
-
-  (regex-dt {:pattern '.*(?i)error.*' :duration 10 :state \"critical\"} 
-            children)
-
-  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
-  [opts & children]
-
-  (apply condition-during {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
-                           :duration (:duration opts) 
-                           :state (:state opts)} 
-                          children))
 
 (defn expired-host
   [opts & children]
@@ -332,18 +322,18 @@ Example:
 (defn generate-stream
   [[stream-key streams-config]]
   (let [s (condp = stream-key
-            :threshold threshold
             :condition condition
             :condition-during condition-during
+            :above above
             :above-during above-during
+            :below below
             :below-during below-during
             :outside-during outside-during
             :between-during between-during
+            :regex-during regex-during
             :scount scount
             :scount-crit scount-crit
-            :percentiles-crit percentiles-crit
-            :regex-during regex-during
-            :critical critical)
+            :percentiles-crit percentiles-crit)
         streams (mapv (fn [config]
                         (let [children (:children config)
                               stream (apply (partial s

@@ -9,28 +9,6 @@
 (use-fixtures :once control-time!)
 (use-fixtures :each reset-time!)
 
-(deftest threshold-test
-  (testing "with warning key"
-    (test-stream (threshold {:warning 30 :critical 70})
-      [{:metric 29}
-       {:metric 30}
-       {:metric 40}
-       {:metric 70}
-       {:metric 90}]
-      [{:metric 30 :state "warning"}
-       {:metric 40 :state "warning"}
-       {:metric 70 :state "critical"}
-       {:metric 90 :state "critical"}]))
-  (testing "without warning key"
-    (test-stream (threshold {:critical 70})
-      [{:metric 29}
-       {:metric 30}
-       {:metric 40}
-       {:metric 70}
-       {:metric 90}]
-      [{:metric 70 :state "critical"}
-       {:metric 90 :state "critical"}])))
-
 (deftest condition-test
   (testing "condition"
     (test-stream (condition {:condition-fn #(and (>= (:metric %) 30)
@@ -76,6 +54,15 @@
                 {:metric 9999 :time 15 :service "bar"}]
                [])))
 
+(deftest above-test
+  (test-stream (above {:threshold 70 :state "critical"})
+    [{:metric 29}
+     {:metric 30}
+     {:metric 40}
+     {:metric 70}
+     {:metric 90}]
+    [{:metric 90 :state "critical"}]))
+
 (deftest above-during-test
   (test-stream (above-during {:threshold 70 :duration 10 :state "critical"})
                [{:metric 40 :time 0}
@@ -90,6 +77,16 @@
                 {:metric 40 :time 12}
                 {:metric 90 :time 13}]
                []))
+
+(deftest below-test
+  (test-stream (below {:threshold 9000 :state "critical"})
+    [{:metric 8000}
+     {:metric 9000}
+     {:metric 9001}
+     {:metric 8999}
+     {:metric 9999}]
+    [{:metric 8000 :state "critical"}
+     {:metric 8999 :state "critical"}]))
 
 (deftest below-during-test
   (test-stream (below-during {:threshold 70 :duration 10 :state "critical"})
@@ -127,15 +124,16 @@
                [{:metric 101 :state "critical" :time 12}
                 {:metric 1   :state "critical" :time 13}]))
 
-(deftest critical-test
-  (test-stream (critical {:duration 10})
-               [{:time 0 :state "critical"}
-                {:time 1 :state "critical"}
-                {:time 12 :state "critical"}
-                {:time 13 :state "critical"}
-                {:time 14 :state "ok"}]
-               [{:state "critical" :time 12}
-                {:state "critical" :time 13}]))
+(deftest regex-during-test
+  (test-stream (regex-during {:pattern ".*(?i)error.*" 
+                              :duration 20
+                              :state "critical"})
+    [{:time 0  :metric "foo"}
+     {:time 10 :metric "bar"}
+     {:time 30 :metric "error"}
+     {:time 51 :metric "ggwp Error"}
+     ]
+    [{:time 51 :metric "ggwp Error" :state "critical"}]))
 
 (deftest generate-streams-test
   (let [out (atom [])
@@ -172,19 +170,6 @@
             {:metric 9500 :state "disaster" :time 13 :service "power"}]
            @out)))
 
-
-  (let [out (atom [])
-        child #(swap! out conj %)
-        s (generate-streams {:critical [{:duration 10
-                                         :children [child]}]})]
-    (s {:time 0 :service "baz" :state "critical"})
-    (s {:time 1 :service "bar" :state "critical"})
-    (s {:time 12 :service "bar" :state "critical"})
-    (s {:time 13 :service "lol" :state "critical"})
-    (s {:time 14  :service "bar" :state "ok"})
-    (is (= @out [{:state "critical" :time 12 :service "bar"}
-                 {:state "critical" :time 13 :service "lol"}])))
-
   (let [out (atom [])
         child #(swap! out conj %)
         s (generate-streams {:regex-during [{:pattern ".*(?i)error.*"
@@ -199,40 +184,17 @@
 
   (let [out (atom [])
         child #(swap! out conj %)
-        s (generate-streams {:critical [{:where #(= (:service %) "bar")
-                                         :duration 10
-                                         :children [child]}]})]
-    (s {:time 0 :service "bar" :state "critical"})
-    (s {:time 1 :service "bar" :state "critical"})
-    (s {:time 12 :service "bar" :state "critical"})
-    (s {:time 13 :service "bar" :state "critical"})
-    (s {:time 14  :service "bar" :state "ok"})
-    (is (= @out [{:state "critical" :time 12 :service "bar"}
-                 {:state "critical" :time 13 :service "bar"}])))
-  (let [out (atom [])
-        child #(swap! out conj %)
-        s (generate-streams {:critical [{:where #(= (:service %) "bar")
-                                         :duration 10
-                                         :children [child]}]
-                             :threshold [{:where #(= (:service %) "foo")
-                                          :warning 30
-                                          :critical 70
+        s (generate-streams {:above [{:where #(= (:service %) "foo")
+                                          :threshold 30
+                                          :state "critical"
                                           :children [child]}]})]
-    (s {:time 0 :service "bar" :state "critical"})
-    (s {:time 1 :service "bar" :state "critical"})
-    (s {:time 12 :service "bar" :state "critical"})
-    (s {:time 13 :service "bar" :state "critical"})
-    (s {:time 14  :service "bar" :state "ok"})
     (s {:service "foo" :metric 29})
     (s {:service "foo" :metric 30})
     (s {:service "foo" :metric 40})
     (s {:service "foo" :metric 70})
     (s {:service "bar" :metric 70})
     (s {:service "foo" :metric 90})
-    (is (= @out [{:state "critical" :time 12 :service "bar"}
-                 {:state "critical" :time 13 :service "bar"}
-                 {:service "foo" :metric 30 :state "warning"}
-                 {:service "foo" :metric 40 :state "warning"}
+    (is (= @out [{:service "foo" :metric 40 :state "critical"}
                  {:service "foo" :metric 70 :state "critical"}
                  {:service "foo" :metric 90 :state "critical"}]))))
 
@@ -287,17 +249,17 @@
            {:time 23 :service "api req 0" :metric 30}]))))
 
 (deftest scount-test
-  (test-stream (scount {:duration 20})
+  (test-stream (scount {:duration 30})
     [{:time 1}
      {:time 19}
      {:time 30}
      {:time 31}
      {:time 35}
      {:time 61}]
-    [{:time 1 :metric 2}
-     {:time 30 :metric 3}
+    [{:time 1  :metric 3}
+     {:time 31 :metric 2}
      ;; no event during the time window
-     (riemann.common/event {:metric 0 :time 61})]))
+     ]))
 
 (deftest scount-crit-test
   (test-stream (scount-crit {:service "foo"
@@ -314,16 +276,5 @@
      {:time 35}
      {:time 61}]
     [{:time 1 :metric 6 :state "critical"}]))
-
-(deftest regex-during-test
-  (test-stream (regex-during {:pattern ".*(?i)error.*" 
-                              :duration 20
-                              :state "critical"})
-    [{:time 0  :metric "foo"}
-     {:time 10 :metric "bar"}
-     {:time 30 :metric "error"}
-     {:time 51 :metric "ggwp Error"}
-     ]
-    [{:time 51 :metric "ggwp Error" :state "critical"}]))
 
 (def kafka-output #(println % " => event"))
