@@ -1,6 +1,6 @@
-(defproject riemann-generic "0.2.0-SNAPSHOT"
+(defproject indusbox/riemann-generic "1.0.0-SNAPSHOT"
   :description "FIXME: write description"
-  :url "http://example.com/FIXME"
+  :url "https://github.com/indusbox/riemann-generic"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[riemann-cond-dt "1.0.3"]]
