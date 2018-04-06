@@ -128,6 +128,28 @@
       (fn [event]
         (call-rescue event children)))))
 
+(defn outside
+  "If the condition `(or (< (:metric event) low) (> (:metric event) high))` is valid for all events received, valid events received will be passed on until an invalid event arrives.
+
+  `opts` keys:
+  - `:min-threshold` : The min threshold
+  - `:max-threshold` : The max threshold
+  - `:state`         : The state of event forwarded to children.
+
+  Example:
+
+  (outside {:min-threshold 70
+            :max-threshold 90
+            :state \"critical\"})
+
+  Set `:state` to \"critical\" if events `:metric` is < to 70 or > 90."
+  [opts & children]
+  (apply condition {:condition-fn #(or 
+                                     (< (:metric %) (:min-threshold opts))
+                                     (> (:metric %) (:max-threshold opts)))
+                    :state (:state opts)}
+                   children))
+
 (defn outside-during
   "If the condition `(or (< (:metric event) low) (> (:metric event) high))` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives.
 
@@ -150,6 +172,30 @@
     (with :state (:state opts)
       (fn [event]
         (call-rescue event children)))))
+
+(defn between
+  "If the condition `(and (> (:metric event) low) (< (:metric event) high))` is valid for all events received, valid events received will be passed on until an invalid event arrives.
+
+  `:metric` should not be nil (it will produce exceptions).
+  `opts` keys:
+  - `:min-threshold` : The min threshold
+  - `:max-threshold` : The max threshold
+  - `:state`         : The state of event forwarded to children.
+
+  Example:
+
+  (between-during {:min-threshold 70
+                   :max-threshold 90
+                   :service \"bar\"
+                   :state \"critical\"})
+
+  Set `:state` to \"critical\" if events `:metric` is > to 70 and < 90."
+  [opts & children]
+  (apply condition {:condition-fn #(and 
+                                     (> (:metric %) (:min-threshold opts))
+                                     (< (:metric %) (:max-threshold opts)))
+                    :state (:state opts)}
+                   children))
 
 (defn between-during
   "If the condition `(and (> (:metric event) low) (< (:metric event) high))` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives.
@@ -176,20 +222,43 @@
       (fn [event]
         (call-rescue event children)))))
 
+(defn regex
+  "if regex `:pattern` matched all events received, the matched events will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+  `:metric` should not be nil (it will produce exceptions).
+
+
+  `opts` keys:
+  - `:pattern`  : A string regex pattern
+  - `:state`    : The state of event forwarded to children.
+
+  Example:
+
+  (regex {:pattern '.*(?i)error.*'
+          :state \"critical\"} 
+         children)
+
+  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
+  [opts & children]
+  (apply condition {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
+                    :state (:state opts)}
+                   children))
+
 (defn regex-during
   "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
 
   `opts` keys:
-  - `:pattern`  : A string regex
+  - `:pattern`  : A string regex pattern
   - `:duration` : The time period in seconds.
   - `:state`    : The state of event forwarded to children.
 
   Example:
 
-  (regex-dt {:pattern '.*(?i)error.*' :duration 10 :state \"critical\"} 
-            children)
+  (regex-during {:pattern '.*(?i)error.*' 
+                 :duration 10 
+                 :state \"critical\"} 
+                children)
 
   Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
   [opts & children]
@@ -328,8 +397,11 @@ Example:
             :above-during above-during
             :below below
             :below-during below-during
+            :outside outside
             :outside-during outside-during
+            :between between
             :between-during between-during
+            :regex regex
             :regex-during regex-during
             :scount scount
             :scount-crit scount-crit
