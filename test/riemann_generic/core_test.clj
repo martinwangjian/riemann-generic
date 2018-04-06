@@ -150,6 +150,14 @@
                [{:metric 80 :state "critical" :time 12}
                 {:metric 81 :state "critical" :time 13}]))
 
+(deftest regex-test
+  (test-stream (regex {:pattern ".*(?i)error.*" :state "critical"})
+    [{:time 0  :metric "foo"}
+     {:time 10 :metric "bar"}
+     {:time 30 :metric "error"}
+     {:time 51 :metric "ggwp Error"}]
+    [{:time 30 :metric "error" :state "critical"}
+     {:time 51 :metric "ggwp Error" :state "critical"}]))
 
 (deftest regex-during-test
   (test-stream (regex-during {:pattern ".*(?i)error.*" 
@@ -158,8 +166,7 @@
     [{:time 0  :metric "foo"}
      {:time 10 :metric "bar"}
      {:time 30 :metric "error"}
-     {:time 51 :metric "ggwp Error"}
-     ]
+     {:time 51 :metric "ggwp Error"}]
     [{:time 51 :metric "ggwp Error" :state "critical"}]))
 
 (deftest generate-streams-test

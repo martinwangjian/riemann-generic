@@ -222,20 +222,43 @@
       (fn [event]
         (call-rescue event children)))))
 
+(defn regex
+  "if regex `:pattern` matched all events received, the matched events will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+  `:metric` should not be nil (it will produce exceptions).
+
+
+  `opts` keys:
+  - `:pattern`  : A string regex pattern
+  - `:state`    : The state of event forwarded to children.
+
+  Example:
+
+  (regex {:pattern '.*(?i)error.*'
+          :state \"critical\"} 
+         children)
+
+  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
+  [opts & children]
+  (apply condition {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
+                    :state (:state opts)}
+                   children))
+
 (defn regex-during
   "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
 
   `opts` keys:
-  - `:pattern`  : A string regex
+  - `:pattern`  : A string regex pattern
   - `:duration` : The time period in seconds.
   - `:state`    : The state of event forwarded to children.
 
   Example:
 
-  (regex-dt {:pattern '.*(?i)error.*' :duration 10 :state \"critical\"} 
-            children)
+  (regex-during {:pattern '.*(?i)error.*' 
+                 :duration 10 
+                 :state \"critical\"} 
+                children)
 
   Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
   [opts & children]
@@ -378,6 +401,7 @@ Example:
             :outside-during outside-during
             :between between
             :between-during between-during
+            :regex regex
             :regex-during regex-during
             :scount scount
             :scount-crit scount-crit
