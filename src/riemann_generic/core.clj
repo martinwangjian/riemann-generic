@@ -128,6 +128,28 @@
       (fn [event]
         (call-rescue event children)))))
 
+(defn outside
+  "If the condition `(or (< (:metric event) low) (> (:metric event) high))` is valid for all events received, valid events received after the `dt` period will be passed on until an invalid event arrives.
+
+  `opts` keys:
+  - `:min-threshold` : The min threshold
+  - `:max-threshold` : The max threshold
+  - `:state`         : The state of event forwarded to children.
+
+  Example:
+
+  (outside {:min-threshold 70
+            :max-threshold 90
+            :state \"critical\"})
+
+  Set `:state` to \"critical\" if events `:metric` is < to 70 or > 90."
+  [opts & children]
+  (apply condition {:condition-fn #(or 
+                                     (< (:metric %) (:min-threshold opts))
+                                     (> (:metric %) (:max-threshold opts)))
+                   :state (:state opts)}
+                   children))
+
 (defn outside-during
   "If the condition `(or (< (:metric event) low) (> (:metric event) high))` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives.
 
@@ -328,6 +350,7 @@ Example:
             :above-during above-during
             :below below
             :below-during below-during
+            :outside outside
             :outside-during outside-during
             :between-during between-during
             :regex-during regex-during
