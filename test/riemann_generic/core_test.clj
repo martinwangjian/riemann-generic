@@ -169,6 +169,47 @@
      {:time 51 :metric "ggwp Error"}]
     [{:time 51 :metric "ggwp Error" :state "critical"}]))
 
+(deftest ddt-above-test
+  (test-stream (ddt-above {:dt 2
+                           :threshold 5
+                           :state "disaster" 
+                           :new-service "ddt-foo"})
+    [{:time 0  :metric 0}
+     {:time 1  :metric 0}
+     {:time 2  :metric -1};ignored
+     {:time 3  :metric 2}
+     {:time 4  :metric -3};ignored
+     {:time 5  :metric 14} 
+     {:time 6  :metric 20};ignored
+     {:time 7  :metric 15} 
+     {:time 8  :metric 20};ignored
+     {:time 9  :metric -1}
+     {:time 10 :metric 0}];ignored
+    [{:time 6  :metric 6 :state "disaster" :service "ddt-foo"}])
+  (test-stream (ddt-above {:dt 3
+                           :threshold 5
+                           :state "warning" 
+                           :new-service "ddt-bar"})
+    [{:time 0  :metric 0}
+     {:time 1  :metric 0};ignored
+     {:time 2  :metric -1}
+     {:time 3  :metric -1};ignored
+     {:time 4  :metric 2} ;ignored
+     {:time 5  :metric -3}
+     {:time 6  :metric -3};ignored
+     {:time 7  :metric 20};ignored
+     {:time 8  :metric 21}
+     {:time 9  :metric 7};ignored
+     {:time 10 :metric 21};ignored
+     {:time 11 :metric 42}
+     {:time 12 :metric 42};ignored
+     {:time 13 :metric -1};ignored
+     {:time 14 :metric 0}
+     {:time 15 :metric 0};ignored
+     {:time 16 :metric 0}];ignored
+    [{:time 9  :metric 8 :state "warning" :service "ddt-bar"}
+     {:time 12 :metric 7 :state "warning" :service "ddt-bar"}]))
+
 (deftest generate-streams-test
   (let [out (atom [])
         child #(swap! out conj %)

@@ -8,7 +8,7 @@
 ;; (setq clojure-defun-style-default-indent t)
 
 (defn condition
-  "Use the `:condition-fn` value (which should be function accepting an event) to set the event `:state` accordely. Forward events to children
+  "Use the `:condition-fn` value (which should be function accepting an event) to set the event `:state` accordingly. Forward events to children
 
   `opts` keys:
   - `:condition-fn` : A function accepting an event and returning a boolean 
@@ -55,7 +55,7 @@
         (call-rescue event children)))))
 
 (defn above
-  "if the `:metric` event value is strictly superior to the values of `:threshold` in `opts` and update the event state accordely, and forward to children.
+  "if the `:metric` event value is strictly superior to the values of `:threshold` in `opts` and update the event state accordingly, and forward to children.
 
   `opts` keys:
   - `:threshold` : A number, the event `:state` will be set to `critical` if the event metric is > to the value. 
@@ -92,7 +92,7 @@
         (call-rescue event children)))))
 
 (defn below
-  "if the `:metric` event value is strictly inferior to the values of `:threshold` in `opts` and update the event state accordely, and forward to children.
+  "if the `:metric` event value is strictly inferior to the values of `:threshold` in `opts` and update the event state accordingly, and forward to children.
 
   `opts` keys:
   - `:threshold` : A number, the event `:state` will be set to `critical` if the event metric is > to the value. 
@@ -223,7 +223,7 @@
         (call-rescue event children)))))
 
 (defn regex
-  "if regex `:pattern` matched all events received, the matched events will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+  "if regex `:pattern` matched all events received, the matched events will be passed on until an invalid event arrives. The matched event `:state` will be set to `state` and forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
 
@@ -244,7 +244,7 @@
                    children))
 
 (defn regex-during
-  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives.  The matched event `:state` will be set to `critical` and forward to children.
+  "if regex `:pattern` matched all events received during at least the period `dt`, matched events received after the `dt` period will be passed on until an invalid event arrives. The matched event `:state` will be set to `:state` and forward to children.
   `:metric` should not be nil (it will produce exceptions).
 
 
@@ -267,6 +267,31 @@
                            :duration (:duration opts) 
                            :state (:state opts)} 
                           children))
+
+(defn ddt-above
+  "Differentiate metrics with respect to time, emits a rate-of-change event every `dt` seconds, divided by the difference in their times. if the `:metric` rate-of-change event is superior to the threshold `threshold`, update the event state and service accordingly, and forward to children.
+  Skips events without metrics.
+
+  `opts` keys:
+  - `:dt`         : emits a rate-of-change event every `dt` seconds
+  - `:threshold`  : The threshold used by the above stream
+  - `:state`      : The state of event forwarded to children.
+  - `:new-service`: The service of event forwarded to children.
+
+  Example:
+  (ddt-above {:dt 2
+              :threshold 5
+              :state \"critical\" 
+              :new-service \"ddt-foo\"}
+             children)
+
+  Set `:state` to \"critical\"  and `:service` to `ddt-foo` if the derivate of metric every 2 seconds is superior to 5"
+  [opts & children]
+  (ddt-real (:dt opts)
+    (where (#(> (:metric %) (:threshold opts)) event)
+      (with {:state (:state opts) :service (:new-service opts)}
+        (fn [event]
+          (call-rescue event children))))))
 
 
 (defn percentile-crit
@@ -344,7 +369,7 @@ Example:
 
   Lazily count the number of events in `:duration` seconds time windows.
   Use the `:warning-fn` and `:critical-fn` values (which should be function
-  accepting an event) to set the event `:state` accordely
+  accepting an event) to set the event `:state` accordingly
 
   Forward the result to children
 
@@ -403,6 +428,7 @@ Example:
             :between-during between-during
             :regex regex
             :regex-during regex-during
+            :ddt-above ddt-above
             :scount scount
             :scount-crit scount-crit
             :percentiles-crit percentiles-crit)
