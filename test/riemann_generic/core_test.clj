@@ -124,6 +124,19 @@
                [{:metric 101 :state "critical" :time 12}
                 {:metric 1   :state "critical" :time 13}]))
 
+(deftest between-test
+  (test-stream (between {:min-threshold 70
+                         :max-threshold 90
+                         :state "critical"})
+               [{:metric 99 :time 0}
+                {:metric 80 :time 1}
+                {:metric 80 :time 12}
+                {:metric 81 :time 13}
+                {:metric 10 :time 14}]
+               [{:metric 80 :state "critical" :time 1}
+                {:metric 80 :state "critical" :time 12}
+                {:metric 81 :state "critical" :time 13}]))
+
 (deftest between-during-test
   (test-stream (between-during {:min-threshold 70
                                 :max-threshold 90

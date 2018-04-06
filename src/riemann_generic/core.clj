@@ -129,7 +129,7 @@
         (call-rescue event children)))))
 
 (defn outside
-  "If the condition `(or (< (:metric event) low) (> (:metric event) high))` is valid for all events received, valid events received after the `dt` period will be passed on until an invalid event arrives.
+  "If the condition `(or (< (:metric event) low) (> (:metric event) high))` is valid for all events received, valid events received will be passed on until an invalid event arrives.
 
   `opts` keys:
   - `:min-threshold` : The min threshold
@@ -147,7 +147,7 @@
   (apply condition {:condition-fn #(or 
                                      (< (:metric %) (:min-threshold opts))
                                      (> (:metric %) (:max-threshold opts)))
-                   :state (:state opts)}
+                    :state (:state opts)}
                    children))
 
 (defn outside-during
@@ -172,6 +172,30 @@
     (with :state (:state opts)
       (fn [event]
         (call-rescue event children)))))
+
+(defn between
+  "If the condition `(and (> (:metric event) low) (< (:metric event) high))` is valid for all events received, valid events received will be passed on until an invalid event arrives.
+
+  `:metric` should not be nil (it will produce exceptions).
+  `opts` keys:
+  - `:min-threshold` : The min threshold
+  - `:max-threshold` : The max threshold
+  - `:state`         : The state of event forwarded to children.
+
+  Example:
+
+  (between-during {:min-threshold 70
+                   :max-threshold 90
+                   :service \"bar\"
+                   :state \"critical\"})
+
+  Set `:state` to \"critical\" if events `:metric` is > to 70 and < 90."
+  [opts & children]
+  (apply condition {:condition-fn #(and 
+                                     (> (:metric %) (:min-threshold opts))
+                                     (< (:metric %) (:max-threshold opts)))
+                    :state (:state opts)}
+                   children))
 
 (defn between-during
   "If the condition `(and (> (:metric event) low) (< (:metric event) high))` is valid for all events received during at least the period `dt`, valid events received after the `dt` period will be passed on until an invalid event arrives.
@@ -352,6 +376,7 @@ Example:
             :below-during below-during
             :outside outside
             :outside-during outside-during
+            :between between
             :between-during between-during
             :regex-during regex-during
             :scount scount
