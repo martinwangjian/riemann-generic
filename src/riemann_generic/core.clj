@@ -276,22 +276,20 @@
   - `:dt`         : emits a rate-of-change event every `dt` seconds
   - `:threshold`  : The threshold used by the above stream
   - `:state`      : The state of event forwarded to children.
-  - `:new-service`: The service of event forwarded to children.
 
   Example:
   (ddt-above {:dt 2
               :threshold 5
-              :state \"critical\" 
-              :new-service \"ddt-foo\"}
+              :state \"critical\" }
              children)
 
-  Set `:state` to \"critical\"  and `:service` to `ddt-foo` if the derivate of metric every 2 seconds is superior to 5"
+  Set `:state` to \"critical\"  and `:service` to `ddt_`+ \"service\" of event if the derivate of metric every 2 seconds is superior to 5"
   [opts & children]
   (ddt-real (:dt opts)
     (where (#(> (:metric %) (:threshold opts)) event)
-      (with {:state (:state opts) :service (:new-service opts)}
-        (fn [event]
-          (call-rescue event children))))))
+      (fn [event]
+        (let [new-event (assoc event :state (:state opts) :service (#(str "ddt_" (:service %)) event))]
+          (call-rescue new-event children))))))
 
 
 (defn percentile-crit
