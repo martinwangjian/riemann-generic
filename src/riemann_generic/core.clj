@@ -223,23 +223,24 @@
         (call-rescue event children)))))
 
 (defn regex
-  "if regex `:pattern` matched all events received, the matched events will be passed on until an invalid event arrives. The matched event `:state` will be set to `state` and forward to children.
-  `:metric` should not be nil (it will produce exceptions).
+  "if regex `:pattern` matched `:field` of all events received, the matched events will be passed on until an invalid event arrives. The matched event `:state` will be set to `state` and forward to children.
 
 
   `opts` keys:
   - `:pattern`  : A string regex pattern
+  - `:field`    : Apply regex to field of event
   - `:state`    : The state of event forwarded to children.
 
   Example:
 
   (regex {:pattern '.*(?i)error.*'
+          :field \"description\"
           :state \"critical\"} 
          children)
 
-  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
+  Set `:state` to \"critical\" if metric of events contain \"error\" in field \"description\" during 10 sec or more."
   [opts & children]
-  (apply condition {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
+  (apply condition {:condition-fn #(re-matches (re-pattern (:pattern opts)) ((keyword (:field opts)) %)) 
                     :state (:state opts)}
                    children))
 
@@ -250,6 +251,7 @@
 
   `opts` keys:
   - `:pattern`  : A string regex pattern
+  - `:field`    : Apply regex to field of event
   - `:duration` : The time period in seconds.
   - `:state`    : The state of event forwarded to children.
 
@@ -262,8 +264,7 @@
 
   Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
   [opts & children]
-
-  (apply condition-during {:condition-fn #(re-matches (re-pattern (:pattern opts)) (:metric %)) 
+  (apply condition-during {:condition-fn #(re-matches (re-pattern (:pattern opts)) ((keyword (:field opts)) %))
                            :duration (:duration opts) 
                            :state (:state opts)} 
                           children))

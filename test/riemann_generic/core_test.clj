@@ -151,23 +151,24 @@
                 {:metric 81 :state "critical" :time 13}]))
 
 (deftest regex-test
-  (test-stream (regex {:pattern ".*(?i)error.*" :state "critical"})
-    [{:time 0  :metric "foo"}
-     {:time 10 :metric "bar"}
-     {:time 30 :metric "error"}
-     {:time 51 :metric "ggwp Error"}]
-    [{:time 30 :metric "error" :state "critical"}
-     {:time 51 :metric "ggwp Error" :state "critical"}]))
+  (test-stream (regex {:pattern ".*(?i)error.*" :state "critical" :field "description"})
+    [{:time 0  :description "foo"}
+     {:time 10 :description "bar"}
+     {:time 30 :description "error"}
+     {:time 51 :description "ggwp Error"}]
+    [{:time 30 :description "error" :state "critical"}
+     {:time 51 :description "ggwp Error" :state "critical"}]))
 
 (deftest regex-during-test
-  (test-stream (regex-during {:pattern ".*(?i)error.*" 
+  (test-stream (regex-during {:pattern ".*(?i)error.*"
+                              :field "description" 
                               :duration 20
                               :state "critical"})
-    [{:time 0  :metric "foo"}
-     {:time 10 :metric "bar"}
-     {:time 30 :metric "error"}
-     {:time 51 :metric "ggwp Error"}]
-    [{:time 51 :metric "ggwp Error" :state "critical"}]))
+    [{:time 0  :description "foo"}
+     {:time 10 :description "bar"}
+     {:time 30 :description "error"}
+     {:time 51 :description "ggwp Error"}]
+    [{:time 51 :description "ggwp Error" :state "critical"}]))
 
 (deftest ddt-above-test
   (test-stream (ddt-above {:dt 2
@@ -272,14 +273,15 @@
   (let [out (atom [])
         child #(swap! out conj %)
         s (generate-streams {:regex-during [{:pattern ".*(?i)error.*"
+                                             :field "description"
                                              :duration 20
                                              :state "critical"
                                              :children [child]}]})]
-    (s {:time 0 :metric "foo"})
-    (s {:time 10 :metric "bar"})
-    (s {:time 30 :metric "error"})
-    (s {:time 51 :metric "ggwp ERROR"})
-    (is (= @out [{:time 51 :metric "ggwp ERROR" :state "critical"}])))
+    (s {:time 0  :description "foo"})
+    (s {:time 10 :description "bar"})
+    (s {:time 30 :description "error"})
+    (s {:time 51 :description "ggwp ERROR"})
+    (is (= @out [{:time 51 :description "ggwp ERROR" :state "critical"}])))
 
   (let [out (atom [])
         child #(swap! out conj %)
