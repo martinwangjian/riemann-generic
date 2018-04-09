@@ -291,6 +291,28 @@
         (let [new-event (assoc event :state (:state opts) :service (#(str "ddt_" (:service %)) event))]
           (call-rescue new-event children))))))
 
+(defn downsample
+  "Generate a new event from events every `duration` seconds foreach `by` fields distinct. The new event will have `:ttl` as ttl and new-service-fn(service) as service 
+
+  `opts` keys:
+  - `by`             : Map of keyword of event, generate a new event foreach fields
+  - `duration`       : Duration of downsampling
+  - `:ttl`           : The ttl of event forwarded to children.
+  - `:new-service-fn`: How to generate the new service of event from service 
+  Example:
+  (downsample {:by [:host :service]
+               :duration 3
+               :ttl 300
+               :new-service-fn #(str \"received:\" (:service %) \"_from:\" (:host %))})
+  Generate a new event with `:ttl` as \"received:(service of event )_from: (host of event)\" and as \"service\" every 3 seconds foreach distinct (\"service\", \"host\")
+"
+  [opts & children]
+  (by (:by opts)
+    (throttle 1 (:duration opts)
+      (fn [event]
+        (let [new-event (assoc event :ttl (:ttl opts) :service ((:new-service-fn opts) event))]
+          (call-rescue new-event children))))))
+
 
 (defn percentile-crit
   [opts & children]
@@ -427,6 +449,7 @@ Example:
             :regex regex
             :regex-during regex-during
             :ddt-above ddt-above
+            :downsample downsample
             :scount scount
             :scount-crit scount-crit
             :percentiles-crit percentiles-crit)
