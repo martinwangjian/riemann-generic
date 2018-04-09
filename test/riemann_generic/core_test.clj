@@ -210,6 +210,32 @@
     [{:time 9  :metric 8 :state "warning" :service "ddt-bar"}
      {:time 12 :metric 7 :state "warning" :service "ddt-bar"}]))
 
+(deftest downsample-test
+  (test-stream (downsample {:by [:host :service]
+                            :duration 3
+                            :ttl 300
+                            :new-service-fn #(str "received:" (:service %) "_from:" (:host %))})
+    [{:time 0  :metric 0 :service "foo" :host "a" }
+     {:time 1  :metric 1 :service "foo" :host "b" }
+     {:time 1  :metric 1 :service "bar" :host "b" }
+     {:time 2  :metric 2 :service "foo" :host "b" }
+     {:time 3  :metric 3 :service "foo" :host "a" }
+     {:time 3  :metric 3 :service "bar" :host "a" }
+     {:time 4  :metric 4 :service "foo" :host "a" }
+     {:time 5  :metric 5 :service "foo" :host "b" }
+     {:time 6  :metric 6 :service "foo" :host "b" }
+     {:time 6  :metric 6 :service "bar" :host "b" }
+     {:time 7  :metric 7 :service "foo" :host "a" }]
+    [{:time 0, :metric 0, :service "received:foo_from:a", :host "a", :ttl 300} 
+     {:time 1, :metric 1, :service "received:foo_from:b", :host "b", :ttl 300}
+     {:time 1, :metric 1, :service "received:bar_from:b", :host "b", :ttl 300} 
+     {:time 3, :metric 3, :service "received:foo_from:a", :host "a", :ttl 300}
+     {:time 3, :metric 3, :service "received:bar_from:a", :host "a", :ttl 300}
+     {:time 5, :metric 5, :service "received:foo_from:b", :host "b", :ttl 300} 
+     {:time 6, :metric 6, :service "received:bar_from:b", :host "b", :ttl 300}
+     {:time 7, :metric 7, :service "received:foo_from:a", :host "a", :ttl 300}
+    ]))
+
 (deftest generate-streams-test
   (let [out (atom [])
         child #(swap! out conj %)
