@@ -268,6 +268,28 @@
                            :duration (:duration opts) 
                            :state (:state opts)} 
                           children))
+(defn ddt-condition
+  "Differentiate metrics with respect to time, emits a rate-of-change event every `dt` seconds, divided by the difference in their times. 
+  if the `condition-fn` apply to the rate-of-change event return true, update the event state and service accordingly, and forward to children.
+  Skips events without metrics.
+
+  `opts` keys:
+  - `:dt`           : emits a rate-of-change event every `dt` seconds
+  - `:condition-fn` : A function accepting an event and returning a boolean.
+  - `:state`        : The state of event forwarded to children.
+
+  Example:
+  (ddt-condition {:dt 3
+                  :condition-fn #(> (:metric %) 5)
+                  :state \"warning\" })
+
+  Set `:state` to \"warning\"  and `:service` to `ddt_`+ \"service\" of event if the function `:condition-fn` apply to the derivate of metric every 3 seconds return true"
+  [opts & children]
+  (ddt-real (:dt opts)
+    (where ((:condition-fn opts) event)
+      (fn [event]
+        (let [new-event (assoc event :state (:state opts) :service (#(str "ddt_" (:service %)) event))]
+          (call-rescue new-event children))))))
 
 (defn ddt-above
   "Differentiate metrics with respect to time, emits a rate-of-change event every `dt` seconds, divided by the difference in their times. if the `:metric` rate-of-change event is superior to the threshold `threshold`, update the event state and service accordingly, and forward to children.
@@ -286,11 +308,32 @@
 
   Set `:state` to \"critical\"  and `:service` to `ddt_`+ \"service\" of event if the derivate of metric every 2 seconds is superior to 5"
   [opts & children]
-  (ddt-real (:dt opts)
-    (where (#(> (:metric %) (:threshold opts)) event)
-      (fn [event]
-        (let [new-event (assoc event :state (:state opts) :service (#(str "ddt_" (:service %)) event))]
-          (call-rescue new-event children))))))
+  (apply ddt-condition {:condition-fn  #(> (:metric %) (:threshold opts))
+                        :dt (:dt opts)
+                        :state (:state opts)}
+                       children))
+
+(defn ddt-below
+  "Differentiate metrics with respect to time, emits a rate-of-change event every `dt` seconds, divided by the difference in their times. if the `:metric` rate-of-change event is inferior to the threshold `threshold`, update the event state and service accordingly, and forward to children.
+  Skips events without metrics.
+
+  `opts` keys:
+  - `:dt`         : emits a rate-of-change event every `dt` seconds
+  - `:threshold`  : The threshold used by the above stream
+  - `:state`      : The state of event forwarded to children.
+
+  Example:
+  (ddt-below {:dt 2
+              :threshold 5
+              :state \"critical\" }
+             children)
+
+  Set `:state` to \"critical\"  and `:service` to `ddt_`+ \"service\" of event if the derivate of metric every 2 seconds is inferior to 5"
+  [opts & children]
+  (apply ddt-condition {:condition-fn  #(< (:metric %) (:threshold opts))
+                        :dt (:dt opts)
+                        :state (:state opts)}
+                       children))
 
 (defn downsample
   "Generate a new event from events every `duration` seconds foreach `by` fields distinct. The new event will have `:ttl` as ttl and new-service-fn(service) as service 
@@ -449,7 +492,9 @@ Example:
             :between-during between-during
             :regex regex
             :regex-during regex-during
+            :ddt-condition ddt-condition
             :ddt-above ddt-above
+            :ddt-below ddt-below
             :downsample downsample
             :scount scount
             :scount-crit scount-crit

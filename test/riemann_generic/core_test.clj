@@ -170,6 +170,30 @@
      {:time 51 :description "ggwp Error"}]
     [{:time 51 :description "ggwp Error" :state "critical"}]))
 
+(deftest ddt-condition-test
+  (test-stream (ddt-condition {:dt 3
+                               :condition-fn #(> (:metric %) 5)
+                               :state "warning" })
+    [{:time 0  :service "bar" :metric 0}
+     {:time 1  :service "bar" :metric 0};ignored
+     {:time 2  :service "bar" :metric -1}
+     {:time 3  :service "bar" :metric -1};ignored
+     {:time 4  :service "bar" :metric 2} ;ignored
+     {:time 5  :service "bar" :metric -3}
+     {:time 6  :service "bar" :metric -3};ignored
+     {:time 7  :service "bar" :metric 20};ignored
+     {:time 8  :service "bar" :metric 21}
+     {:time 9  :service "bar" :metric 7};ignored
+     {:time 10 :service "bar" :metric 21};ignored
+     {:time 11 :service "bar" :metric 42}
+     {:time 12 :service "bar" :metric 42};ignored
+     {:time 13 :service "bar" :metric -1};ignored
+     {:time 14 :service "bar" :metric 0}
+     {:time 15 :service "bar" :metric 0};ignored
+     {:time 16 :service "bar" :metric 0}];ignored
+    [{:time 9  :metric 8 :state "warning" :service "ddt_bar"}
+     {:time 12 :metric 7 :state "warning" :service "ddt_bar"}]))
+
 (deftest ddt-above-test
   (test-stream (ddt-above {:dt 2
                            :threshold 5
@@ -208,6 +232,27 @@
      {:time 16 :service "bar" :metric 0}];ignored
     [{:time 9  :metric 8 :state "warning" :service "ddt_bar"}
      {:time 12 :metric 7 :state "warning" :service "ddt_bar"}]))
+
+(deftest ddt-below-test
+  (test-stream (ddt-below {:dt 2
+                           :threshold 5
+                           :state "disaster"})
+    [{:time 0  :service "foo" :metric 0}
+     {:time 1  :service "foo" :metric 0}
+     {:time 2  :service "foo" :metric -1};ignored
+     {:time 3  :service "foo" :metric 2}
+     {:time 4  :service "foo" :metric -3};ignored
+     {:time 5  :service "foo" :metric 14} 
+     {:time 6  :service "foo" :metric 20};ignored
+     {:time 7  :service "foo" :metric 16} 
+     {:time 8  :service "foo" :metric 20};ignored
+     {:time 9  :service "foo" :metric -2}
+     {:time 10 :service "foo" :metric 0}];ignored
+    [{:time 2  :metric 0 :state "disaster" :service "ddt_foo"}
+     {:time 4  :metric 1 :state "disaster" :service "ddt_foo"}
+     {:time 8  :metric 1 :state "disaster" :service "ddt_foo"}
+     {:time 10  :metric -9 :state "disaster" :service "ddt_foo"}
+    ]))
 
 (deftest downsample-test
   (test-stream (downsample {:by [:host :service]
